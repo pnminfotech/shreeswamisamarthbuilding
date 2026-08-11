@@ -186,6 +186,7 @@ firstRentMonth: { type: String }, // e.g. "Jan-26"
           // default: "Cash",
           required: true,
         },
+        note: { type: String, default: "" },
         default: [],
       },
       
@@ -255,6 +256,28 @@ firstRentMonth: { type: String }, // e.g. "Jan-26"
             default: "due",
           },
           createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    lightBillStatusHistory: {
+      type: [
+        {
+          month: { type: String, required: true },
+          status: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    roomShopLightBillHistory: {
+      type: [
+        {
+          month: { type: String, required: true },
+          totalReading: { type: Number, default: 0 },
+          pricePerUnit: { type: Number, default: 0 },
+          amount: { type: Number, default: 0 },
+          status: { type: String, default: "" },
+          updatedAt: { type: Date },
         },
       ],
       default: [],

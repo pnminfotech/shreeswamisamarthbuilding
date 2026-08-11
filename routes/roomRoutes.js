@@ -237,10 +237,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "wingName is required when hasWing is enabled" });
     }
 
-    if (normalizedPropertyType === "room" && !normalizedFlatType) {
-      return res.status(400).json({ message: "flatType is required for residential rooms" });
-    }
-
     const existing = await Room.findOne({
       propertyType: normalizedPropertyType,
       category: cat,

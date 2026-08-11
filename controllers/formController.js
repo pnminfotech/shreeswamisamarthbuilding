@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Form = require("../models/formModels");
 const Archive = require("../models/archiveSchema");
 const DuplicateForm = require("../models/DuplicateForm");
+const Room = require("../models/Room");
 const cron = require("node-cron");
 const Counter = require("../models/counterModel");
 const { normalizeFirstRentCycle } = require("../routes/_helpers/firstRentCycle");
@@ -88,6 +89,14 @@ function parseImportedFirstRentStatus(value) {
   }
 
   return "NOT_PAID";
+}
+
+function normalizeImportText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getPrimaryUnitBedNo(propertyType) {
+  return String(propertyType || "").trim().toLowerCase() === "shop" ? "SHOP-1" : "ROOM-1";
 }
 
 /* ============================================================================
@@ -411,9 +420,12 @@ const importForms = async (req, res) => {
       const joiningDate = parseRequiredDate(row.joiningDate);
       const depositAmount = parseOptionalNumber(row.depositAmount) ?? 0;
       const canteen = normalizeCanteenValue(row.canteen);
+      const category = String(row.category || "").trim();
+      const wingName = String(row.wingName || "").trim();
+      const floorNo = String(row.floorNo || "").trim();
       const roomNo = String(row.roomNo || "").trim();
       const bedNo = String(row.bedNo || "").trim();
-      const baseRent = parseOptionalNumber(row.bedPrice);
+      const importedBaseRent = parseOptionalNumber(row.bedPrice);
       const rentCycle = String(row.rentCycle || "").trim();
       const propertyType = bedNo ? "bed" : "room";
       const firstRentStatus = parseImportedFirstRentStatus(rentCycle);
@@ -435,20 +447,96 @@ const importForms = async (req, res) => {
         errors.push({ row: rowNumber, message: "Joining Date is invalid or missing" });
         continue;
       }
+      if (!roomNo) {
+        errors.push({ row: rowNumber, message: "Flat / Room is required" });
+        continue;
+      }
+
+      let matchedRoom = null;
+      let baseRent = importedBaseRent;
+
+      if (propertyType === "room") {
+        const roomQuery = {
+          propertyType: "room",
+          roomNo,
+        };
+
+        if (category) roomQuery.category = category;
+        if (wingName) roomQuery.wingName = wingName;
+        if (floorNo) roomQuery.floorNo = floorNo;
+
+        matchedRoom = await Room.findOne(roomQuery).lean();
+
+        if (!matchedRoom) {
+          const candidateRooms = await Room.find({
+            propertyType: "room",
+            roomNo,
+          }).lean();
+
+          matchedRoom =
+            candidateRooms.find((room) => {
+              if (category && normalizeImportText(room.category) !== normalizeImportText(category)) {
+                return false;
+              }
+              if (wingName && normalizeImportText(room.wingName) !== normalizeImportText(wingName)) {
+                return false;
+              }
+              if (floorNo && normalizeImportText(room.floorNo) !== normalizeImportText(floorNo)) {
+                return false;
+              }
+              return true;
+            }) || null;
+        }
+
+        if (!matchedRoom) {
+          errors.push({
+            row: rowNumber,
+            message: `Room ${roomNo} not found in Manage Rooms`,
+          });
+          continue;
+        }
+
+        const primaryBed = Array.isArray(matchedRoom.beds) ? matchedRoom.beds[0] : null;
+        const roomPrice = parseOptionalNumber(primaryBed?.price);
+        baseRent = roomPrice ?? importedBaseRent;
+
+        if (baseRent == null || baseRent <= 0) {
+          errors.push({
+            row: rowNumber,
+            message: `Price not found for room ${roomNo} in Manage Rooms`,
+          });
+          continue;
+        }
+      }
 
       try {
         const nextSrNo = await assignNextSrNoAndUpdateCounter();
+        const resolvedBedNo =
+          propertyType === "room" || propertyType === "shop"
+            ? getPrimaryUnitBedNo(propertyType)
+            : bedNo;
+        const resolvedRoomNo = matchedRoom?.roomNo || roomNo;
+        const resolvedWingName = matchedRoom?.wingName || wingName || undefined;
+        const resolvedFloorNo = matchedRoom?.floorNo || floorNo || undefined;
+        const resolvedCategory = matchedRoom?.category || category;
+        const resolvedFlatType = matchedRoom?.flatType || undefined;
         const payload = {
           srNo: Number(nextSrNo),
           name,
           phoneNo,
           joiningDate,
+          category: resolvedCategory,
+          roomId: matchedRoom?._id ? String(matchedRoom._id) : undefined,
           depositAmount,
           canteen,
-          roomNo,
-          bedNo,
+          roomNo: resolvedRoomNo,
+          bedNo: resolvedBedNo,
           propertyType,
+          wingName: resolvedWingName,
+          floorNo: resolvedFloorNo,
+          flatType: resolvedFlatType,
           baseRent,
+          rentAmount: baseRent,
           rentCycle,
           firstRentStatus,
           firstRentMonth,
@@ -459,8 +547,8 @@ const importForms = async (req, res) => {
           payload.rentHistory = [
             {
               effectiveFrom: joiningDate,
-              roomNo,
-              bedNo,
+              roomNo: resolvedRoomNo,
+              bedNo: resolvedBedNo,
               baseRent,
               rentAmount: baseRent,
               source: "excel-import",
@@ -545,12 +633,25 @@ const normalizeRentEntry = (rent, fallbackDate) => {
     canteenApplied: normalizeCanteenValue(rent?.canteenApplied),
     discountAmount: Number(rent?.discountAmount) || 0,
     paymentMode: rent?.paymentMode || "Cash",
+    note: String(rent?.note || "").trim(),
   };
 };
 
 const updateForm = async (req, res) => {
   const { id } = req.params;
-  const { rentAmount, date, month, paymentMode, rentUpdateMode, expectedRent, canteenApplied, discountAmount } = req.body;
+  const {
+    rentAmount,
+    date,
+    month,
+    paymentMode,
+    rentUpdateMode,
+    expectedRent,
+    canteenApplied,
+    discountAmount,
+    note,
+    lightBillStatusHistory,
+    roomShopLightBillHistory,
+  } = req.body;
   const resolvedMonth = normalizeRentMonth(month, date);
   const resolvedDate = new Date(date);
 
@@ -601,14 +702,52 @@ const updateForm = async (req, res) => {
       });
     }
 
-    form.rents = normalizedRents;
-    await form.save({ validateModifiedOnly: true });
+    const nextRents = normalizedRents.map((rent) => ({
+      ...rent,
+      note: String(rent?.note || "").trim(),
+    }));
+
+    if (rentIndex !== -1) {
+      nextRents[rentIndex] = {
+        ...nextRents[rentIndex],
+        note: String(note || "").trim(),
+      };
+    } else if (nextRents.length > 0) {
+      nextRents[nextRents.length - 1] = {
+        ...nextRents[nextRents.length - 1],
+        note: String(note || "").trim(),
+      };
+    }
+
+    const update = {
+      rents: nextRents,
+    };
+
+    if (Array.isArray(lightBillStatusHistory)) {
+      update.lightBillStatusHistory = lightBillStatusHistory;
+    }
+    if (Array.isArray(roomShopLightBillHistory)) {
+      update.roomShopLightBillHistory = roomShopLightBillHistory;
+    }
+
+    const updatedForm = await Form.findByIdAndUpdate(
+      id,
+      { $set: update },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedForm) {
+      return res.status(404).json({ message: "Form not found" });
+    }
 
     let rentReceiptStatus = { ok: false, skipped: true, reason: "Not attempted" };
     if (incomingAmount > 0) {
       try {
         rentReceiptStatus = await sendRentReceiptMessage({
-          tenant: form,
+          tenant: updatedForm,
           amount: incomingAmount,
           month: resolvedMonth,
         });
@@ -625,7 +764,7 @@ const updateForm = async (req, res) => {
     }
 
     res.status(200).json({
-      ...form.toObject(),
+      ...updatedForm.toObject(),
       _rentReceiptStatus: rentReceiptStatus,
     });
   } catch (error) {

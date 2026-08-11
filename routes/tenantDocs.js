@@ -221,7 +221,7 @@ router.post(
         const up = await imagekit.upload({
           file: uploadBuffer,
           fileName: uploadName,
-          folder: "/amhostel/tenant_docs",
+          folder: "/swamisamarthbuilding/tenant_docs",
           useUniqueFileName: true,
         });
 

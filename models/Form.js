@@ -116,6 +116,7 @@ const formSchema = new mongoose.Schema(
         enum: ["Cash", "Online"],
         // default: "Cash",
       },
+      note: { type: String, default: "" },
     },
   ],
   default: [],   // ✅ VERY IMPORTANT
@@ -170,6 +171,28 @@ const formSchema = new mongoose.Schema(
         },
       },
     ],
+    lightBillStatusHistory: {
+      type: [
+        {
+          month: { type: String },
+          status: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    roomShopLightBillHistory: {
+      type: [
+        {
+          month: { type: String },
+          totalReading: { type: Number, default: 0 },
+          pricePerUnit: { type: Number, default: 0 },
+          amount: { type: Number, default: 0 },
+          status: { type: String, default: "" },
+          updatedAt: { type: Date },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
