@@ -99,6 +99,19 @@ function getPrimaryUnitBedNo(propertyType) {
   return String(propertyType || "").trim().toLowerCase() === "shop" ? "SHOP-1" : "ROOM-1";
 }
 
+function normalizeRoomPropertyType(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "room" || raw === "shop") return raw;
+  return "bed";
+}
+
+function normalizeRoomNo(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+}
+
 /* ============================================================================
    SrNo HELPERS
    ==========================================================================*/
@@ -427,7 +440,7 @@ const importForms = async (req, res) => {
       const bedNo = String(row.bedNo || "").trim();
       const importedBaseRent = parseOptionalNumber(row.bedPrice);
       const rentCycle = String(row.rentCycle || "").trim();
-      const propertyType = bedNo ? "bed" : "room";
+      const importedPropertyType = bedNo ? "bed" : "room";
       const firstRentStatus = parseImportedFirstRentStatus(rentCycle);
       const firstRentMonth = formatMonthKey(
         firstRentStatus === "ADVANCE_PAID"
@@ -455,7 +468,7 @@ const importForms = async (req, res) => {
       let matchedRoom = null;
       let baseRent = importedBaseRent;
 
-      if (propertyType === "room") {
+      if (importedPropertyType === "room") {
         const roomQuery = {
           propertyType: "room",
           roomNo,
@@ -489,6 +502,28 @@ const importForms = async (req, res) => {
         }
 
         if (!matchedRoom) {
+          const anyTypeRooms = await Room.find({}).lean();
+          const sameRoomNo = anyTypeRooms.filter(
+            (room) => normalizeRoomNo(room?.roomNo) === normalizeRoomNo(roomNo)
+          );
+
+          matchedRoom =
+            sameRoomNo.find((room) => {
+              if (category && normalizeImportText(room.category) !== normalizeImportText(category)) {
+                return false;
+              }
+              if (wingName && normalizeImportText(room.wingName) !== normalizeImportText(wingName)) {
+                return false;
+              }
+              if (floorNo && normalizeImportText(room.floorNo) !== normalizeImportText(floorNo)) {
+                return false;
+              }
+              return true;
+            }) ||
+            (sameRoomNo.length === 1 ? sameRoomNo[0] : null);
+        }
+
+        if (!matchedRoom) {
           errors.push({
             row: rowNumber,
             message: `Room ${roomNo} not found in Manage Rooms`,
@@ -511,10 +546,14 @@ const importForms = async (req, res) => {
 
       try {
         const nextSrNo = await assignNextSrNoAndUpdateCounter();
+        const resolvedPropertyType = matchedRoom
+          ? normalizeRoomPropertyType(matchedRoom.propertyType)
+          : importedPropertyType;
+        const matchedPrimaryBed = Array.isArray(matchedRoom?.beds) ? matchedRoom.beds[0] : null;
         const resolvedBedNo =
-          propertyType === "room" || propertyType === "shop"
-            ? getPrimaryUnitBedNo(propertyType)
-            : bedNo;
+          resolvedPropertyType === "room" || resolvedPropertyType === "shop"
+            ? getPrimaryUnitBedNo(resolvedPropertyType)
+            : bedNo || String(matchedPrimaryBed?.bedNo || "").trim() || getPrimaryUnitBedNo("bed");
         const resolvedRoomNo = matchedRoom?.roomNo || roomNo;
         const resolvedWingName = matchedRoom?.wingName || wingName || undefined;
         const resolvedFloorNo = matchedRoom?.floorNo || floorNo || undefined;
@@ -531,7 +570,7 @@ const importForms = async (req, res) => {
           canteen,
           roomNo: resolvedRoomNo,
           bedNo: resolvedBedNo,
-          propertyType,
+          propertyType: resolvedPropertyType,
           wingName: resolvedWingName,
           floorNo: resolvedFloorNo,
           flatType: resolvedFlatType,
@@ -580,7 +619,7 @@ const importForms = async (req, res) => {
       }
     }
 
-    return res.status(created.length ? 201 : 400).json({
+    return res.status(created.length ? 201 : 200).json({
       ok: created.length > 0,
       importedCount: created.length,
       failedCount: errors.length,
