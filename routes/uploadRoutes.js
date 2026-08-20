@@ -8,7 +8,13 @@ const path = require("path");
 const router = express.Router();
 
 // ✅ Multer memory (not disk)
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 10,
+  },
+});
 
 function hasImageKitConfig() {
   return (
@@ -72,8 +78,30 @@ async function compressUnder10KB(buf) {
   return out;
 }
 
+const uploadDocsMiddleware = (req, res, next) => {
+  upload.array("documents", 10)(req, res, (error) => {
+    if (!error) return next();
+
+    if (error instanceof multer.MulterError) {
+      const isTooLarge = error.code === "LIMIT_FILE_SIZE";
+      return res.status(isTooLarge ? 413 : 400).json({
+        ok: false,
+        message: isTooLarge
+          ? "One or more images are too large. Please upload smaller photos."
+          : error.message,
+        code: error.code,
+      });
+    }
+
+    return res.status(400).json({
+      ok: false,
+      message: error.message || "Upload failed",
+    });
+  });
+};
+
 // POST /api/uploads/docs  ✅ ImageKit-only
-router.post("/docs", upload.array("documents", 10), async (req, res) => {
+router.post("/docs", uploadDocsMiddleware, async (req, res) => {
   try {
     const canUseImagekit = hasImageKitConfig();
 
