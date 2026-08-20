@@ -995,7 +995,7 @@ const updateProfile = async (req, res) => {
         updateData[field] = undefined;
       }
     });
-    ["familyMembers", "depositAmount", "baseRent", "rentAmount"].forEach((field) => {
+    ["age", "familyMembers", "maleCount", "femaleCount", "childrenCount", "depositAmount", "baseRent", "rentAmount"].forEach((field) => {
       if (Object.prototype.hasOwnProperty.call(updateData, field)) {
         updateData[field] = parseOptionalNumber(updateData[field]);
       }
@@ -1006,6 +1006,11 @@ const updateProfile = async (req, res) => {
     if (Object.prototype.hasOwnProperty.call(updateData, "canteen")) {
       updateData.canteen = normalizeCanteenValue(updateData.canteen);
     }
+    ["officeName", "companyAddress", "officeMobile"].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(updateData, field)) {
+        updateData[field] = String(updateData[field] || "").trim();
+      }
+    });
     Object.assign(updateData, normalizeFirstRentCycle(existing.toObject(), updateData));
     const rentHistoryUpdate = appendRentHistorySnapshot(existing.toObject(), updateData);
     if (rentHistoryUpdate.rentHistory) {
@@ -1068,8 +1073,9 @@ const updateFormById = async (req, res) => {
     }
 
     const allowed = [
-      "name","phoneNo","address","joiningDate","dob","relativeAddress1",
-      "roomNo","bedNo","baseRent","rentAmount","companyAddress","shopName","shopBusiness","dateOfJoiningCollege","depositAmount","familyMembers",
+      "name","age","phoneNo","address","joiningDate","dob","relativeAddress1","relativeAddress2",
+      "roomNo","bedNo","baseRent","rentAmount","officeName","companyAddress","officeMobile","shopName","shopBusiness","dateOfJoiningCollege","depositAmount","familyMembers",
+      "maleCount","femaleCount","childrenCount","otherFamilyMembers","passportNo","panCardNo","aadharCardNo","previousAddress","natureOfWork",
       "relative1Relation","relative1Name","relative1Phone",
       "relative2Relation","relative2Name","relative2Phone",
       "pincode","city","state","houseNo","nearbyPlace",
@@ -1089,7 +1095,7 @@ const updateFormById = async (req, res) => {
         update[field] = undefined;
       }
     });
-    ["familyMembers", "depositAmount", "baseRent", "rentAmount"].forEach((field) => {
+    ["age", "familyMembers", "maleCount", "femaleCount", "childrenCount", "depositAmount", "baseRent", "rentAmount"].forEach((field) => {
       if (Object.prototype.hasOwnProperty.call(update, field)) {
         update[field] = parseOptionalNumber(update[field]);
       }
@@ -1110,6 +1116,17 @@ const updateFormById = async (req, res) => {
     if (Object.prototype.hasOwnProperty.call(update, "companyAddress")) {
       update.companyAddress = String(update.companyAddress || "").trim();
     }
+    if (Object.prototype.hasOwnProperty.call(update, "officeName")) {
+      update.officeName = String(update.officeName || "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(update, "officeMobile")) {
+      update.officeMobile = String(update.officeMobile || "").trim();
+    }
+    ["passportNo", "panCardNo", "aadharCardNo", "previousAddress", "natureOfWork"].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(update, field)) {
+        update[field] = String(update[field] || "").trim();
+      }
+    });
 
     const existing = await Form.findById(id);
     if (!existing) return res.status(404).json({ message: "Form not found" });

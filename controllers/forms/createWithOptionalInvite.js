@@ -268,6 +268,17 @@ async function createWithOptionalInvite(req, res) {
   if (Object.prototype.hasOwnProperty.call(rest, "companyAddress")) {
     rest.companyAddress = String(rest.companyAddress || "").trim();
   }
+  if (Object.prototype.hasOwnProperty.call(rest, "officeName")) {
+    rest.officeName = String(rest.officeName || "").trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(rest, "officeMobile")) {
+    rest.officeMobile = String(rest.officeMobile || "").trim();
+  }
+  ["passportNo", "panCardNo", "aadharCardNo", "previousAddress", "natureOfWork"].forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(rest, field)) {
+      rest[field] = String(rest[field] || "").trim();
+    }
+  });
 
   /* ---------------------------------------------------------
      ✅ FIX 1: STORE monthly rent into baseRent (BEFORE deleting)

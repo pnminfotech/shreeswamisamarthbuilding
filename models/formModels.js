@@ -89,6 +89,7 @@ const formSchema = new mongoose.Schema(
     srNo: { type: Number, unique: true, required: true },
 
     name: { type: String, required: true },
+    age: { type: Number },
     joiningDate: { type: Date, required: true },
     category: { type: String },
     roomId: { type: String },
@@ -112,8 +113,8 @@ const formSchema = new mongoose.Schema(
     phoneNo: { type: Number, required: true },
 
     // ⛔ removed address text fields for relatives as per your request
-    // relativeAddress1: { type: String },
-    // relativeAddress2: { type: String },
+    relativeAddress1: { type: String, default: "" },
+    relativeAddress2: { type: String, default: "" },
 
     // ✅ relative contact triplets (relation + name + phone)
     relative1Relation: {
@@ -136,8 +137,28 @@ const formSchema = new mongoose.Schema(
     bedNo: { type: String },
     shopName: { type: String },
     shopBusiness: { type: String },
+    officeName: { type: String },
     companyAddress: { type: String },
+    officeMobile: { type: String },
     familyMembers: { type: Number },
+    otherFamilyMembers: {
+      type: [
+        {
+          name: { type: String, default: "" },
+          age: { type: Number },
+          occupation: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    maleCount: { type: Number },
+    femaleCount: { type: Number },
+    childrenCount: { type: Number },
+    passportNo: { type: String },
+    panCardNo: { type: String },
+    aadharCardNo: { type: String },
+    previousAddress: { type: String },
+    natureOfWork: { type: String },
     dateOfJoiningCollege: { type: Date,  },
     dob: { type: Date },
 

@@ -34,6 +34,7 @@ const formSchema = new mongoose.Schema(
     srNo: { type: Number, unique: true, required: true },
 
     name: { type: String, required: true },
+    age: { type: Number },
     joiningDate: { type: Date, required: true },
     roomId: { type: String },
     roomNo: { type: String },
@@ -61,6 +62,7 @@ const formSchema = new mongoose.Schema(
     },
     relative1Name: { type: String, default: "" },
     relative1Phone: { type: String, default: "" },
+    relativeAddress1: { type: String, default: "" },
 
     relative2Relation: {
       type: String,
@@ -69,14 +71,35 @@ const formSchema = new mongoose.Schema(
     },
     relative2Name: { type: String, default: "" },
     relative2Phone: { type: String, default: "" },
+    relativeAddress2: { type: String, default: "" },
 
     floorNo: { type: String },
     bedNo: { type: String },
     shopName: { type: String },
     shopBusiness: { type: String },
+    officeName: { type: String },
     companyAddress: { type: String },
+    officeMobile: { type: String },
     familyMembers: { type: Number },
-    dateOfJoiningCollege: { type: Date, required: true },
+    otherFamilyMembers: {
+      type: [
+        {
+          name: { type: String, default: "" },
+          age: { type: Number },
+          occupation: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    maleCount: { type: Number },
+    femaleCount: { type: Number },
+    childrenCount: { type: Number },
+    passportNo: { type: String },
+    panCardNo: { type: String },
+    aadharCardNo: { type: String },
+    previousAddress: { type: String },
+    natureOfWork: { type: String },
+    dateOfJoiningCollege: { type: Date },
     dob: { type: Date, required: true },
 
     baseRent: { type: Number },
@@ -160,6 +183,7 @@ const formSchema = new mongoose.Schema(
             "Brother",
             "Self Aadhaar Card",
             "Parent Aadhaar Card",
+            "Partner Aadhaar Card",
             "Tenant Photo",
           ],
           default: "Self",

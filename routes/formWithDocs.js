@@ -135,6 +135,23 @@ router.post("/forms-with-docs", upload.array("documents", 10), async (req, res) 
 
     const toDate = (v) => (v ? new Date(v) : undefined);
     const toNum = (v) => (v !== undefined && v !== "" ? Number(v) : undefined);
+    const parseOtherFamilyMembers = (value) => {
+      if (!value) return [];
+      try {
+        const members = Array.isArray(value) ? value : JSON.parse(String(value));
+        return Array.isArray(members)
+          ? members
+              .map((member) => ({
+                name: String(member?.name || "").trim(),
+                age: member?.age === "" || member?.age == null ? undefined : Number(member.age),
+                occupation: String(member?.occupation || "").trim(),
+              }))
+              .filter((member) => member.name || member.age !== undefined || member.occupation)
+          : [];
+      } catch (_) {
+        return [];
+      }
+    };
 
     const joiningDate = toDate(body.joiningDate);
     const rentAmount = toNum(body.baseRent ?? body.rentAmount);
@@ -164,6 +181,10 @@ const firstRentMonth = String(body.firstRentMonth || rentMonth).trim();
 
     const formPayload = {
       name: body.name,
+      age:
+        body.age === "" || body.age == null
+          ? undefined
+          : toNum(body.age),
       joiningDate,
       roomId: body.roomId ? String(body.roomId).trim() : undefined,
       roomNo: body.roomNo,
@@ -180,11 +201,31 @@ const firstRentMonth = String(body.firstRentMonth || rentMonth).trim();
       bedNo: body.bedNo,
       shopName: String(body.shopName || "").trim(),
       shopBusiness: String(body.shopBusiness || "").trim(),
+      officeName: String(body.officeName || "").trim(),
       companyAddress: String(body.companyAddress || "").trim(),
+      officeMobile: String(body.officeMobile || "").trim(),
       familyMembers:
         body.familyMembers === "" || body.familyMembers == null
           ? undefined
           : toNum(body.familyMembers),
+      maleCount:
+        body.maleCount === "" || body.maleCount == null
+          ? undefined
+          : toNum(body.maleCount),
+      femaleCount:
+        body.femaleCount === "" || body.femaleCount == null
+          ? undefined
+          : toNum(body.femaleCount),
+      childrenCount:
+        body.childrenCount === "" || body.childrenCount == null
+          ? undefined
+          : toNum(body.childrenCount),
+      otherFamilyMembers: parseOtherFamilyMembers(body.otherFamilyMembers),
+      passportNo: String(body.passportNo || "").trim(),
+      panCardNo: String(body.panCardNo || "").trim(),
+      aadharCardNo: String(body.aadharCardNo || "").trim(),
+      previousAddress: String(body.previousAddress || "").trim(),
+      natureOfWork: String(body.natureOfWork || "").trim(),
       dateOfJoiningCollege: toDate(body.dateOfJoiningCollege),
       dob: toDate(body.dob),
       baseRent: toNum(body.baseRent ?? body.rentAmount),
@@ -199,9 +240,11 @@ firstRentMonth: body.firstRentMonth,
       relative1Relation: body.relative1Relation,
       relative1Name: body.relative1Name,
       relative1Phone: body.relative1Phone,
+      relativeAddress1: body.relativeAddress1,
       relative2Relation: body.relative2Relation,
       relative2Name: body.relative2Name,
       relative2Phone: body.relative2Phone,
+      relativeAddress2: body.relativeAddress2,
     };
     const currentRentAmount = getCurrentMonthlyRent(formPayload);
 

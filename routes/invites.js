@@ -72,6 +72,22 @@ function toDateOrUndefined(value) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function normalizeOtherFamilyMembers(value) {
+  let members = value;
+  if (typeof value === "string") {
+    try { members = JSON.parse(value); } catch (_) { members = []; }
+  }
+  return Array.isArray(members)
+    ? members
+        .map((member) => ({
+          name: toTrimmedString(member?.name) || "",
+          age: toNumberOrUndefined(member?.age),
+          occupation: toTrimmedString(member?.occupation) || "",
+        }))
+        .filter((member) => member.name || member.age !== undefined || member.occupation)
+    : [];
+}
+
 function buildInvitePrefill(source = {}) {
   const trackerType = inferTrackerType(source);
   const bedNo =
@@ -92,6 +108,7 @@ function buildInvitePrefill(source = {}) {
     wingName: trackerType === "room" ? toTrimmedString(source.wingName) : undefined,
     floorNo: trackerType === "room" ? toTrimmedString(source.floorNo) : undefined,
     name: toTrimmedString(source.name),
+    age: toNumberOrUndefined(source.age),
     phoneNo: toTrimmedPhone(source.phoneNo),
     address: toTrimmedString(source.address),
     pincode: toTrimmedString(source.pincode),
@@ -102,15 +119,39 @@ function buildInvitePrefill(source = {}) {
     relativeAddress:
       trackerType === "bed" ? toTrimmedString(source.relativeAddress) : undefined,
     relative1Relation: trackerType === "bed" ? toTrimmedString(source.relative1Relation) : undefined,
-    relative1Name: trackerType === "bed" ? toTrimmedString(source.relative1Name) : undefined,
-    relative1Phone: trackerType === "bed" ? toTrimmedPhone(source.relative1Phone) : undefined,
+    relative1Name: trackerType !== "shop" ? toTrimmedString(source.relative1Name) : undefined,
+    relative1Phone: trackerType !== "shop" ? toTrimmedPhone(source.relative1Phone) : undefined,
+    relativeAddress1: trackerType !== "shop" ? toTrimmedString(source.relativeAddress1) : undefined,
     relative2Relation: trackerType === "bed" ? toTrimmedString(source.relative2Relation) : undefined,
-    relative2Name: trackerType === "bed" ? toTrimmedString(source.relative2Name) : undefined,
-    relative2Phone: trackerType === "bed" ? toTrimmedPhone(source.relative2Phone) : undefined,
+    relative2Name: trackerType !== "shop" ? toTrimmedString(source.relative2Name) : undefined,
+    relative2Phone: trackerType !== "shop" ? toTrimmedPhone(source.relative2Phone) : undefined,
+    relativeAddress2: trackerType !== "shop" ? toTrimmedString(source.relativeAddress2) : undefined,
+    officeName:
+      trackerType !== "shop" ? toTrimmedString(source.officeName) : undefined,
     companyAddress:
       trackerType !== "shop" ? toTrimmedString(source.companyAddress) : undefined,
+    officeMobile:
+      trackerType !== "shop" ? toTrimmedPhone(source.officeMobile) : undefined,
     familyMembers:
       trackerType === "room" ? toNumberOrUndefined(source.familyMembers) : undefined,
+    maleCount:
+      trackerType === "room" ? toNumberOrUndefined(source.maleCount) : undefined,
+    femaleCount:
+      trackerType === "room" ? toNumberOrUndefined(source.femaleCount) : undefined,
+    childrenCount:
+      trackerType === "room" ? toNumberOrUndefined(source.childrenCount) : undefined,
+    otherFamilyMembers:
+      trackerType === "room" ? normalizeOtherFamilyMembers(source.otherFamilyMembers) : undefined,
+    passportNo:
+      trackerType === "room" ? toTrimmedString(source.passportNo) : undefined,
+    panCardNo:
+      trackerType === "room" ? toTrimmedString(source.panCardNo) : undefined,
+    aadharCardNo:
+      trackerType === "room" ? toTrimmedString(source.aadharCardNo) : undefined,
+    previousAddress:
+      trackerType === "room" ? toTrimmedString(source.previousAddress) : undefined,
+    natureOfWork:
+      trackerType === "room" ? toTrimmedString(source.natureOfWork) : undefined,
     shopName: trackerType === "shop" ? toTrimmedString(source.shopName) : undefined,
     shopBusiness:
       trackerType === "shop" ? toTrimmedString(source.shopBusiness) : undefined,
@@ -145,6 +186,17 @@ function applyInviteQueryParams(url, prefill) {
   if (prefill.familyMembers != null) {
     url.searchParams.set("familyMembers", String(prefill.familyMembers));
   }
+  if (prefill.maleCount != null) url.searchParams.set("maleCount", String(prefill.maleCount));
+  if (prefill.femaleCount != null) url.searchParams.set("femaleCount", String(prefill.femaleCount));
+  if (prefill.childrenCount != null) url.searchParams.set("childrenCount", String(prefill.childrenCount));
+  if (prefill.otherFamilyMembers?.length) {
+    url.searchParams.set("otherFamilyMembers", JSON.stringify(prefill.otherFamilyMembers));
+  }
+  if (prefill.passportNo) url.searchParams.set("passportNo", String(prefill.passportNo));
+  if (prefill.panCardNo) url.searchParams.set("panCardNo", String(prefill.panCardNo));
+  if (prefill.aadharCardNo) url.searchParams.set("aadharCardNo", String(prefill.aadharCardNo));
+  if (prefill.previousAddress) url.searchParams.set("previousAddress", String(prefill.previousAddress));
+  if (prefill.natureOfWork) url.searchParams.set("natureOfWork", String(prefill.natureOfWork));
   if (prefill.joiningDate) url.searchParams.set("joiningDate", String(prefill.joiningDate));
   if (prefill.baseRent != null) url.searchParams.set("baseRent", String(prefill.baseRent));
   if (prefill.rentAmount != null) url.searchParams.set("rentAmount", String(prefill.rentAmount));
@@ -177,6 +229,7 @@ router.post("/", async (req, res) => {
     const createdForm = await Form.create({
       srNo,
       name: prefill.name,
+      age: prefill.age,
       phoneNo: prefill.phoneNo ? Number(prefill.phoneNo) : undefined,
       category: prefill.category,
       propertyType: prefill.propertyType,
@@ -193,14 +246,27 @@ router.post("/", async (req, res) => {
       houseNo: prefill.houseNo,
       nearbyPlace: prefill.nearbyPlace,
       relativeAddress: prefill.relativeAddress,
+      relativeAddress1: prefill.relativeAddress1,
+      relativeAddress2: prefill.relativeAddress2,
       relative1Relation: prefill.relative1Relation,
       relative1Name: prefill.relative1Name,
       relative1Phone: prefill.relative1Phone,
       relative2Relation: prefill.relative2Relation,
       relative2Name: prefill.relative2Name,
       relative2Phone: prefill.relative2Phone,
+      officeName: prefill.officeName,
       companyAddress: prefill.companyAddress,
+      officeMobile: prefill.officeMobile,
       familyMembers: prefill.familyMembers,
+      maleCount: prefill.maleCount,
+      femaleCount: prefill.femaleCount,
+      childrenCount: prefill.childrenCount,
+      otherFamilyMembers: prefill.otherFamilyMembers,
+      passportNo: prefill.passportNo,
+      panCardNo: prefill.panCardNo,
+      aadharCardNo: prefill.aadharCardNo,
+      previousAddress: prefill.previousAddress,
+      natureOfWork: prefill.natureOfWork,
       shopName: prefill.shopName,
       shopBusiness: prefill.shopBusiness,
       dateOfJoiningCollege: toDateOrUndefined(prefill.dateOfJoiningCollege),
