@@ -1,6 +1,7 @@
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
 const SECRET_KEY = 'your-secret-key'; // Use a secure key
 
@@ -44,20 +45,41 @@ const registerUser = async (req, res) => {
 
 // Login user
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
-  
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' }); // Send JSON response
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+      }
+
+      // Avoid leaving the browser waiting until the proxy times out. Proxy timeout
+      // responses commonly omit our CORS headers and appear as a misleading CORS error.
+      if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({
+          message: 'Login service is temporarily unavailable. Please try again shortly.',
+        });
+      }
+
+      const user = await User.findOne({ email: String(email).trim() });
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid credentials' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: 'Invalid credentials' });
+      }
+
+      const token = jwt.sign(
+        { userId: user._id, username: user.username },
+        SECRET_KEY,
+        { expiresIn: '1h' }
+      );
+      return res.json({ token });
+    } catch (error) {
+      console.error('Login failed:', error.message);
+      return res.status(500).json({ message: 'Unable to log in right now. Please try again.' });
     }
-  
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(400).json({ message: 'Invalid credentials' }); // Send JSON response
-    }
-  
-    const token = jwt.sign({ userId: user._id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
-    res.json({ token }); // Send the token as JSON
   };
   
 
