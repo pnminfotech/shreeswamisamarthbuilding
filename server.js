@@ -68,7 +68,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 // Static files for uploaded content (if any local)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -111,7 +111,12 @@ app.use("/api/admin", adminNotificationsRouter);
 connectDB();
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`✅ Server running: http://localhost:${PORT}`);
   console.log(`✅ Health:        http://localhost:${PORT}/api/health`);
 });
+
+// Give slow mobile uploads enough time while still closing stalled sockets.
+server.requestTimeout = 120000;
+server.headersTimeout = 125000;
+server.keepAliveTimeout = 65000;

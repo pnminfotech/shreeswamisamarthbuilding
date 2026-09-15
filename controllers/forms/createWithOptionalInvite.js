@@ -142,7 +142,7 @@ const mongoose = require("mongoose");
 const Invite = require("../../models/Invite");
 const Form = require("../../models/formModels");
 const { getCurrentMonthlyRent } = require("../../routes/_helpers/rentHistory");
-const { sendAdmissionMessage } = require("../../lib/msg91Admission");
+const { queueAdmissionMessage } = require("../../lib/msg91Admission");
 
 // Re-use central SrNo helper from formController
 const {
@@ -318,19 +318,7 @@ async function createWithOptionalInvite(req, res) {
     try {
       await assertBedIsVacant(rest);
       const saved = await createFormWithSrNo(rest, null);
-      let messageStatus = { ok: false, skipped: true, reason: "Not attempted" };
-      try {
-        messageStatus = await sendAdmissionMessage(saved);
-      } catch (error) {
-        console.error("MSG91 admission message failed:", error?.data || error?.message || error);
-        messageStatus = {
-          ok: false,
-          skipped: false,
-          reason: error?.message || "MSG91 send failed",
-          data: error?.data || null,
-          status: error?.status || null,
-        };
-      }
+      const messageStatus = queueAdmissionMessage(saved);
 
       const payload = saved.toObject ? saved.toObject() : saved;
       payload._messageStatus = messageStatus;
@@ -400,19 +388,7 @@ async function createWithOptionalInvite(req, res) {
       }
     }
 
-    let messageStatus = { ok: false, skipped: true, reason: "Not attempted" };
-    try {
-      messageStatus = await sendAdmissionMessage(created);
-    } catch (error) {
-      console.error("MSG91 admission message failed:", error?.data || error?.message || error);
-      messageStatus = {
-        ok: false,
-        skipped: false,
-        reason: error?.message || "MSG91 send failed",
-        data: error?.data || null,
-        status: error?.status || null,
-      };
-    }
+    const messageStatus = queueAdmissionMessage(created);
 
     const payload = created?.toObject ? created.toObject() : created;
     payload._messageStatus = messageStatus;

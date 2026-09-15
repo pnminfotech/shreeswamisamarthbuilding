@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const Invite = require("../models/Invite");
 const Form = require("../models/formModels");
 const Counter = require("../models/counterModel");
-const { sendAdmissionMessage } = require("../lib/msg91Admission");
+const { queueAdmissionMessage } = require("../lib/msg91Admission");
 
 const router = express.Router();
 
@@ -416,19 +416,7 @@ router.put("/:token/submit", async (req, res) => {
       { new: true }
     );
 
-    let messageStatus = { ok: false, skipped: true, reason: "Not attempted" };
-    try {
-      messageStatus = await sendAdmissionMessage(updated);
-    } catch (error) {
-      console.error("MSG91 admission message failed:", error?.data || error?.message || error);
-      messageStatus = {
-        ok: false,
-        skipped: false,
-        reason: error?.message || "MSG91 send failed",
-        data: error?.data || null,
-        status: error?.status || null,
-      };
-    }
+    const messageStatus = queueAdmissionMessage(updated);
 
     return res.json({
       ok: true,
