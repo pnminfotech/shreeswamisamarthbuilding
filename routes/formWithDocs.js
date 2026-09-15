@@ -34,7 +34,10 @@ function getImageKit() {
   });
 }
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+});
 const TARGET = 300 * 1024; // 300 KB target for faster uploads
 const MIN_WIDTH = 1200; // keep text readable for IDs
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
@@ -288,7 +291,9 @@ firstRentMonth: body.firstRentMonth,
       });
     }
 
-    const docs = await Promise.all(files.map(async (f, i) => {
+    const docs = [];
+    for (let i = 0; i < files.length; i += 1) {
+      const f = files[i];
       const relation = (relations[i] || "Document").toString().trim() || "Document";
       const safeBaseName = (f.originalname || "doc").replace(/[^\w.\-]/g, "_");
 
@@ -299,8 +304,7 @@ firstRentMonth: body.firstRentMonth,
       // ✅ If image => compress to webp (skip if already small)
       if (/^image\//i.test(f.mimetype)) {
         const alreadySmall = f.buffer?.length && f.buffer.length <= TARGET;
-        const alreadyWebp = /image\/webp/i.test(f.mimetype);
-        if (!alreadySmall || !alreadyWebp) {
+        if (!alreadySmall) {
           uploadBuffer = await compressUnderTarget(f.buffer, f.mimetype);
           contentType = "image/webp";
           uploadName = `${Date.now()}_${safeBaseName}.webp`;
@@ -314,7 +318,7 @@ firstRentMonth: body.firstRentMonth,
         useUniqueFileName: true,
       });
 
-      return {
+      docs.push({
         fileName: f.originalname,
         relation,
         fileId: uploadRes.fileId,     // string
@@ -322,8 +326,8 @@ firstRentMonth: body.firstRentMonth,
         contentType,
         size: uploadBuffer.length,
         url: uploadRes.url,           // ✅ always present
-      };
-    }));
+      });
+    }
 
     // ✅ Update existing draft
     if (formId) {
